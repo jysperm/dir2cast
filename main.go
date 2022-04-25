@@ -13,6 +13,8 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/hajimehoshi/go-mp3"
+
 	id3 "github.com/mikkyang/id3-go"
 	id3v2 "github.com/mikkyang/id3-go/v2"
 )
@@ -21,16 +23,19 @@ import (
 var feedTmpl string
 
 type FeedInfo struct {
-	Title    string
-	BaseURL  string
-	Episodes []Episode
+	Title     string
+	BaseURL   string
+	BuildTime string
+	Episodes  []Episode
 }
 
 type Episode struct {
 	Title       string
 	PubDate     string
 	Description string
+	Duration    int64
 	FileName    string
+	FileSize    int64
 	ArtworkData []byte
 }
 
@@ -48,7 +53,8 @@ func main() {
 	}
 
 	feedInfo := FeedInfo{
-		Title: path.Base(cwd),
+		Title:     path.Base(cwd),
+		BuildTime: time.Now().Format(time.RFC1123Z),
 	}
 
 	for _, file := range files {
@@ -86,6 +92,7 @@ func main() {
 	port := 8080
 
 	fmt.Printf("[HTTP] Listening on port %d ...\n", port)
+	fmt.Println("[HTTP] You can subscribe via http://<your LAN address>:8080/feed.xml")
 	http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 }
 
@@ -99,8 +106,22 @@ func findEpisodes(feedInfo *FeedInfo, filename string) *Episode {
 	return nil
 }
 
-func parseEpisode(file fs.FileInfo) Episode {
-	tag, err := id3.Open(file.Name())
+func parseEpisode(fileInfo fs.FileInfo) Episode {
+	file, err := os.OpenFile(fileInfo.Name(), os.O_RDWR, 0666)
+
+	if err != nil {
+		panic(err)
+	}
+
+	mp3Decoder, err := mp3.NewDecoder(file)
+
+	durationSec := mp3Decoder.Length() / 4 / int64(mp3Decoder.SampleRate())
+
+	if err != nil {
+		panic(err)
+	}
+
+	tag, err := id3.Open(fileInfo.Name())
 
 	if err != nil {
 		panic(err)
@@ -115,10 +136,12 @@ func parseEpisode(file fs.FileInfo) Episode {
 	framePIC := id3v2.ParseImageFrame(dataFramePIC.FrameHead, dataFramePIC.Bytes()).(*id3v2.ImageFrame)
 
 	return Episode{
-		Title:       strings.TrimSuffix(file.Name(), ".mp3"),
-		PubDate:     file.ModTime().Format(time.RFC1123Z),
+		Title:       strings.TrimSuffix(fileInfo.Name(), ".mp3"),
+		PubDate:     fileInfo.ModTime().Format(time.RFC1123Z),
 		Description: strings.Replace(frameULT.Text(), "\x00", "", -1),
-		FileName:    file.Name(),
+		Duration:    durationSec,
+		FileName:    fileInfo.Name(),
+		FileSize:    fileInfo.Size(),
 		ArtworkData: append([]byte{0xff, 0xd8, 0xff, 0xe0, 0x00}, framePIC.Data()...),
 	}
 }

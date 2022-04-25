@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" xmlns:atom="http://www.w3.org/2005/Atom">
+<rss xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd" version="2.0">
   <channel>
     <title>{{ .Title }}</title>
+    <link>{{ .BaseURL }}/feed.xml</link>
     <itunes:image href="{{ .BaseURL }}/cover.jpg"/>
+    <lastBuildDate>Sat, 25 Mar 2006 11:30:00 -0500</lastBuildDate>
     <generator>dir2cast</generator>
     {{ $baseURL := .BaseURL }}
     {{ range $i, $episode := .Episodes }}
@@ -13,7 +15,8 @@
         </description>
         <guid>{{ $episode.FileName }}</guid>
         <pubDate>{{ $episode.PubDate }}</pubDate>
-        <enclosure type="audio/x-m4a" url="{{ $baseURL }}/download/{{ html $episode.FileName }}"></enclosure>
+        <itunes:duration>{{ $episode.Duration }}</itunes:duration>
+        <enclosure type="audio/mpeg" url="{{ $baseURL }}/download/{{ html $episode.FileName }}" length="{{ $episode.FileSize }}" />
       </item>
     {{ end }}
   </channel>
