@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"path"
 	"strings"
@@ -77,8 +78,14 @@ func main() {
 			panic(err)
 		}
 
-		if r.URL.Path == "/" || r.URL.Path == "/feed.xml" {
+		if r.URL.Path == "/" || strings.HasSuffix(r.URL.Path, ".xml") {
+			feedName, err := url.QueryUnescape(r.URL.Path[len("/") : len(r.URL.Path)-len(".xml")])
+
+			if err == nil && feedName == feedInfo.Title {
 			w.Write(feed.Bytes())
+			} else {
+				w.WriteHeader(404)
+			}
 		} else if strings.HasPrefix(r.URL.Path, "/download") {
 			filename := r.URL.Path[len("/download/"):]
 			episode := findEpisodes(&feedInfo, filename)
@@ -92,7 +99,7 @@ func main() {
 	port := 8080
 
 	fmt.Printf("[HTTP] Listening on port %d ...\n", port)
-	fmt.Println("[HTTP] You can subscribe via http://<your LAN address>:8080/feed.xml")
+	fmt.Printf("[HTTP] You can subscribe via http://<your LAN address>:8080/%s.xml\n", url.QueryEscape(feedInfo.Title))
 	http.ListenAndServe(fmt.Sprintf(":%d", port), nil)
 }
 
