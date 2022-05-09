@@ -82,7 +82,7 @@ func main() {
 			feedName, err := url.QueryUnescape(r.URL.Path[len("/") : len(r.URL.Path)-len(".xml")])
 
 			if err == nil && feedName == feedInfo.Title {
-			w.Write(feed.Bytes())
+				w.Write(feed.Bytes())
 			} else {
 				w.WriteHeader(404)
 			}
@@ -136,19 +136,31 @@ func parseEpisode(fileInfo fs.FileInfo) Episode {
 
 	defer tag.Close()
 
-	dataFrameULT := tag.Frame("ULT").(*id3v2.DataFrame)
-	dataFramePIC := tag.Frame("PIC").(*id3v2.DataFrame)
+	tagULT := tag.Frame("ULT")
+	description := ""
 
-	frameULT := id3v2.ParseUnsynchTextFrame(dataFrameULT.FrameHead, dataFrameULT.Bytes()).(*id3v2.UnsynchTextFrame)
-	framePIC := id3v2.ParseImageFrame(dataFramePIC.FrameHead, dataFramePIC.Bytes()).(*id3v2.ImageFrame)
+	if tagULT != nil {
+		dataFrameULT := tagULT.(*id3v2.DataFrame)
+		frameULT := id3v2.ParseUnsynchTextFrame(dataFrameULT.FrameHead, dataFrameULT.Bytes()).(*id3v2.UnsynchTextFrame)
+		description = strings.Replace(frameULT.Text(), "\x00", "", -1)
+	}
+
+	tagPIC := tag.Frame("PIC")
+	artworkData := []byte{}
+
+	if tagPIC != nil {
+		dataFramePIC := tagPIC.(*id3v2.DataFrame)
+		framePIC := id3v2.ParseImageFrame(dataFramePIC.FrameHead, dataFramePIC.Bytes()).(*id3v2.ImageFrame)
+		artworkData = append([]byte{0xff, 0xd8, 0xff, 0xe0, 0x00}, framePIC.Data()...)
+	}
 
 	return Episode{
 		Title:       strings.TrimSuffix(fileInfo.Name(), ".mp3"),
 		PubDate:     fileInfo.ModTime().Format(time.RFC1123Z),
-		Description: strings.Replace(frameULT.Text(), "\x00", "", -1),
+		Description: description,
 		Duration:    durationSec,
 		FileName:    fileInfo.Name(),
 		FileSize:    fileInfo.Size(),
-		ArtworkData: append([]byte{0xff, 0xd8, 0xff, 0xe0, 0x00}, framePIC.Data()...),
+		ArtworkData: artworkData,
 	}
 }
