@@ -89,7 +89,12 @@ func main() {
 		} else if strings.HasPrefix(r.URL.Path, "/download") {
 			filename := r.URL.Path[len("/download/"):]
 			episode := findEpisodes(&feedInfo, filename)
-			http.ServeFile(w, r, episode.FileName)
+
+			if episode != nil {
+				http.ServeFile(w, r, episode.FileName)
+			} else {
+				w.WriteHeader(404)
+			}
 		} else if r.URL.Path == "/cover.jpg" {
 			w.Header().Add("Content-Type", "image/jpeg")
 			w.Write(feedInfo.Episodes[0].ArtworkData)
